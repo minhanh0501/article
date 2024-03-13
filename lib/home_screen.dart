@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'article_model.dart';
+import 'details_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -10,11 +11,25 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('News'),
-        centerTitle: true,
-        backgroundColor: Colors.lightBlue,
+        title: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Flutter'),
+            Text(
+              '_News',
+              style: TextStyle(
+                color: Color.fromARGB(255, 217, 49, 49),
+              ),
+            )
+          ],
+        ),
+        titleTextStyle: const TextStyle(
+            color: Color.fromARGB(255, 217, 49, 49),
+            fontWeight: FontWeight.bold,
+            fontSize: 25),
+        backgroundColor: Color.fromARGB(255, 204, 235, 201),
       ),
-      body: FutureBuilder<List<Article>>(
+      body: FutureBuilder(
         future: getArticles(),
         builder: (context, snapshot) {
           switch (snapshot.connectionState) {
@@ -30,7 +45,7 @@ class HomeScreen extends StatelessWidget {
                 return ListView.builder(
                   itemCount: articles.length,
                   itemBuilder: (context, index) {
-                    return _buildArticleItem(context, articles[index]);
+                    return customListTile(articles[index], context);
                   },
                 );
               } else if (snapshot.hasError) {
@@ -48,36 +63,78 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildArticleItem(BuildContext context, Article article) {
+  Widget customListTile(Article article, BuildContext context) {
     return InkWell(
       onTap: () {
-        // Xử lý khi người dùng nhấn vào một bài báo
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => ArticlePage(
+                      article: article,
+                    )));
       },
-      child: Card(
-        margin: const EdgeInsets.all(8),
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (article.urlToImage != null)
-                Image.network(
-                  article.urlToImage!,
-                  width: double.infinity,
-                  height: 200,
-                  fit: BoxFit.cover,
-                ),
-              const SizedBox(height: 8),
-              Text(
-                article.title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+      child: Container(
+        margin: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(8.0),
+        decoration: BoxDecoration(
+          color: Color.fromARGB(255, 239, 241, 240),
+          borderRadius: BorderRadius.circular(12.0),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromARGB(31, 0, 0, 0),
+              blurRadius: 10.0,
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 100.0,
+              width: 100.0,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12.0),
+                image: article.urlToImage != null
+                    ? DecorationImage(
+                        image: NetworkImage(article.urlToImage!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8.0),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    article.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16.0,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    'By ${article.author ?? 'Unknown'}',
+                    style: const TextStyle(
+                      color: Color.fromARGB(255, 115, 115, 115),
+                      fontSize: 14.0,
+                    ),
+                  ),
+                  const SizedBox(height: 8.0),
+                  Text(
+                    article.publishedAt ?? 'Unknown',
+                    style: const TextStyle(
+                      fontSize: 12.0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -85,18 +142,35 @@ class HomeScreen extends StatelessWidget {
 
   Future<List<Article>> getArticles() async {
     const url =
-        'https://newsapi.org/v2/top-headlines?country=us&category=business&apiKey=6a87f549883f44f0bb7066fd1ba5a491';
-    final res = await http.get(Uri.parse(url));
-    final body = json.decode(res.body) as Map<String, dynamic>;
-    final List<Article> result = [];
-    for (final article in body['articles']) {
-      result.add(
-        Article(
-          title: article['title'],
-          urlToImage: article['urlToImage'],
-        ),
-      );
+        'https://newsapi.org/v2/everything?q=tesla&from=2024-02-13&sortBy=publishedAt&apiKey=6a87f549883f44f0bb7066fd1ba5a491';
+    try {
+      final res = await http.get(Uri.parse(url));
+      final body = json.decode(res.body) as Map<String, dynamic>;
+      final List<Article> result = [];
+      if (body['articles'] != null) {
+        for (final article in body['articles']) {
+          result.add(
+            Article(
+              title: article['title'],
+              author: article['author'],
+              description: article['description'],
+              url: article['url'],
+              urlToImage: article['urlToImage'],
+              publishedAt: article['publishedAt'],
+              content: article['content'],
+              source: Source(
+                id: article['source']['id'],
+                name: article['source']['name'],
+              ),
+            ),
+          );
+        }
+      } else {
+        throw Exception('No articles found');
+      }
+      return result;
+    } catch (error) {
+      throw Exception('Failed to load articles: $error');
     }
-    return result;
   }
 }
